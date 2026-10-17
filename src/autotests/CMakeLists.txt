@@ -41,6 +41,11 @@ ecm_add_tests(
 )
 
 ecm_add_test(
+    TabColorStyleTest.cpp
+    LINK_LIBRARIES konsoleprivate Qt::Test ${KONSOLE_TEST_LIBS}
+)
+
+ecm_add_test(
     ProcessInfoTest.cpp
     LINK_LIBRARIES konsoleprivate KF6::CoreAddons Qt::Test ${KONSOLE_TEST_LIBS}
 )

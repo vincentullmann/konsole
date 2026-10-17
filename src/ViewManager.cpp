@@ -680,7 +680,7 @@ Session *ViewManager::createSession(const Profile::Ptr &profile, const QString &
         }
     }
 
-    updateAutoContainerTabColor(session);
+    applyAutomaticTabColor(session);
 
     return session;
 }
@@ -836,6 +836,12 @@ void ViewManager::splitView(Qt::Orientation orientation, bool fromNextTab)
         const QString directory = profile->startInCurrentSessionDir() ? activeSession->currentWorkingDirectory() : QString();
         auto *session = createSession(profile, directory);
 
+        // A split-off Pane keeps the Manual Pane Color, so the Tab Color stays uniform
+        if (activeSession->isTabColorSetByUser()) {
+            session->tabColorSetByUser(true);
+            session->setColor(activeSession->color());
+        }
+
         focused = terminalDisplay = createView(session);
         Q_EMIT activeViewChanged(activeViewController());
     }
@@ -928,34 +934,39 @@ void ViewManager::handleSessionContainerContextChanged(const ContainerInfo &cont
         ContainerSessionState::clearPendingContainerInfo(session);
     }
 
-    updateAutoContainerTabColor(session);
+    applyAutomaticTabColor(session);
 }
 
-void ViewManager::updateAutoContainerTabColor(Session *session)
+void ViewManager::applyAutomaticTabColor(Session *session)
 {
+    // Pane Color precedence: Manual > container auto-color > profile
     if (session == nullptr || session->isTabColorSetByUser()) {
         return;
     }
 
-    const Profile::Ptr profile = SessionManager::instance()->sessionProfile(session);
-    if (!profile || profile->tabColor().isValid()) {
-        return;
-    }
-
-    if (!session->isInContainer()) {
+    QString key;
+    if (session->isInContainer()) {
+        key = ContainerRegistry::keyFromContainerInfo(session->containerContext());
+    } else {
         const auto pending = ContainerSessionState::pendingContainerInfo(session);
         if (pending.isActive()) {
-            session->setColor(colorForContainerKey(pending.key));
-            return;
+            key = pending.key;
         }
-        session->setColor(QColor());
+    }
+
+    if (!key.isEmpty()) {
+        session->setColor(colorForContainerKey(key));
         return;
     }
 
-    const QString key = ContainerRegistry::keyFromContainerInfo(session->containerContext());
-    if (!key.isEmpty()) {
-        session->setColor(colorForContainerKey(key));
-    }
+    const Profile::Ptr profile = SessionManager::instance()->sessionProfile(session);
+    session->setColor(profile ? profile->tabColor() : QColor());
+}
+
+void ViewManager::resetTabColor(Session *session)
+{
+    session->tabColorSetByUser(false);
+    applyAutomaticTabColor(session);
 }
 
 QColor ViewManager::colorForContainerKey(const QString &containerKey)
@@ -1210,6 +1221,8 @@ void ViewManager::updateViewsForSession(Session *session)
     for (TerminalDisplay *view : sessionMapKeys) {
         applyProfileToView(view, profile);
     }
+    // Applying the profile may have replaced a container color with the profile color
+    applyAutomaticTabColor(session);
 }
 
 void ViewManager::profileChanged(const Profile::Ptr &profile)
@@ -1222,6 +1235,8 @@ void ViewManager::profileChanged(const Profile::Ptr &profile)
         // if session uses this profile, update the display
         if (iter.key() != nullptr && iter.value() != nullptr && SessionManager::instance()->sessionProfile(iter.value()) == profile) {
             applyProfileToView(iter.key(), profile);
+            // Applying the profile may have replaced a container color with the profile color
+            applyAutomaticTabColor(iter.value());
         }
     }
 }

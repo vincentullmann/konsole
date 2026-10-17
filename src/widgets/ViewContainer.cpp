@@ -8,13 +8,20 @@
 #include "widgets/ViewContainer.h"
 #include "config-konsole.h"
 
+// Std
+#include <array>
+#include <utility>
+
 // Qt
 #include <QBoxLayout>
+#include <QColorDialog>
 #include <QFile>
 #include <QIcon>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QMenu>
+#include <QPixmap>
+#include <QPointer>
 #include <QTabBar>
 
 // KF
@@ -140,6 +147,38 @@ TabbedViewContainer::TabbedViewContainer(ViewManager *connectedViewManager, QWid
             renameTab(_contextMenuTabIndex);
         });
     editAction->setObjectName(QStringLiteral("edit-rename"));
+
+    auto tabColorMenu = _contextPopupMenu->addMenu(QIcon::fromTheme(QStringLiteral("color-management")), i18nc("@title:menu", "Tab Color"));
+    tabColorMenu->setObjectName(QStringLiteral("tab-color"));
+    const std::array<std::pair<QColor, KLocalizedString>, 8> tabColorPalette = {{
+        {QColor(0xda, 0x44, 0x53), ki18nc("@item:inmenu tab color", "Red")},
+        {QColor(0xf6, 0x74, 0x00), ki18nc("@item:inmenu tab color", "Orange")},
+        {QColor(0xfd, 0xbc, 0x4b), ki18nc("@item:inmenu tab color", "Yellow")},
+        {QColor(0x27, 0xae, 0x60), ki18nc("@item:inmenu tab color", "Green")},
+        {QColor(0x1a, 0xbc, 0x9c), ki18nc("@item:inmenu tab color", "Cyan")},
+        {QColor(0x3d, 0xae, 0xe9), ki18nc("@item:inmenu tab color", "Blue")},
+        {QColor(0x8e, 0x44, 0xad), ki18nc("@item:inmenu tab color", "Purple")},
+        {QColor(0x7f, 0x8c, 0x8d), ki18nc("@item:inmenu tab color", "Grey")},
+    }};
+    for (const auto &[color, name] : tabColorPalette) {
+        QPixmap swatch(16, 16);
+        swatch.fill(color);
+        tabColorMenu->addAction(QIcon(swatch), name.toString(), this, [this, color] {
+            setTabColor(_contextMenuTabIndex, color);
+        });
+    }
+    tabColorMenu->addSeparator();
+    tabColorMenu->addAction(QIcon::fromTheme(QStringLiteral("color-picker")), i18nc("@action:inmenu", "Custom..."), this, [this] {
+        // The tab may move or close while the dialog is open
+        const QPointer<ViewSplitter> splitter = viewSplitterAt(_contextMenuTabIndex);
+        const QColor color = QColorDialog::getColor(effectiveTabColor(splitter), this, i18nc("@title:window", "Tab Color"));
+        if (color.isValid() && splitter != nullptr) {
+            setTabColor(indexOf(splitter), color);
+        }
+    });
+    tabColorMenu->addAction(QIcon::fromTheme(QStringLiteral("edit-reset")), i18nc("@action:inmenu", "Reset"), this, [this] {
+        resetTabColor(_contextMenuTabIndex);
+    });
 
     auto closeAction = _contextPopupMenu->addAction(QIcon::fromTheme(QStringLiteral("tab-close")), i18nc("@action:inmenu", "Close Tab"), this, [this] {
         closeTerminalTab(_contextMenuTabIndex);
@@ -682,6 +721,35 @@ void TabbedViewContainer::updateColors(ViewProperties *item)
 
     Q_EMIT setColor(index, effectiveTabColor(topLevelSplitter));
     Q_EMIT setActivityColor(index, effectiveTabActivityColor(topLevelSplitter));
+}
+
+QList<Session *> TabbedViewContainer::paneSessions(int index)
+{
+    QList<Session *> sessions;
+    if (auto *splitter = viewSplitterAt(index)) {
+        const auto displays = splitter->findChildren<TerminalDisplay *>();
+        for (TerminalDisplay *display : displays) {
+            sessions.append(display->sessionController()->session());
+        }
+    }
+    return sessions;
+}
+
+void TabbedViewContainer::setTabColor(int index, const QColor &color)
+{
+    const auto panes = paneSessions(index);
+    for (Session *session : panes) {
+        session->tabColorSetByUser(true);
+        session->setColor(color);
+    }
+}
+
+void TabbedViewContainer::resetTabColor(int index)
+{
+    const auto panes = paneSessions(index);
+    for (Session *session : panes) {
+        _connectedViewManager->resetTabColor(session);
+    }
 }
 
 QColor TabbedViewContainer::effectiveTabColor(ViewSplitter *splitter) const

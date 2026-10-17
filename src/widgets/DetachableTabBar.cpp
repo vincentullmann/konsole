@@ -6,6 +6,7 @@
 
 #include "DetachableTabBar.h"
 #include "KonsoleSettings.h"
+#include "widgets/TabColorStyle.h"
 #include "widgets/ViewContainer.h"
 
 #include <QApplication>
@@ -29,6 +30,16 @@ DetachableTabBar::DetachableTabBar(QWidget *parent)
     setAcceptDrops(true);
     setElideMode(Qt::TextElideMode::ElideLeft);
     KAcceleratorManager::setNoAccel(this);
+    setStyle(new TabColorStyle(this));
+}
+
+QColor DetachableTabBar::fullTabColor(int idx) const
+{
+    if (KonsoleSettings::tabColorStyle() != KonsoleSettings::EnumTabColorStyle::FullTab) {
+        return {};
+    }
+    const QColor color = tabData(idx).value<DetachableTabData>().color;
+    return color.isValid() && color.alpha() > 0 ? color : QColor();
 }
 
 void DetachableTabBar::setColor(int idx, const QColor &color)
@@ -201,12 +212,17 @@ void DetachableTabBar::paintEvent(QPaintEvent *event)
         const DetachableTabData tabData = data.value<DetachableTabData>();
 
         const bool colorValid = tabData.color.isValid() && tabData.color.alpha() > 0;
+        const QColor fullTabFill = fullTabColor(tabIndex);
 
-        if (!colorValid && !tabData.progress.has_value()) {
+        // A filled tab already shows its color, so only progress gets a bar
+        if ((!colorValid || fullTabFill.isValid()) && !tabData.progress.has_value()) {
             continue;
         }
 
-        const QColor color = colorValid ? tabData.color : palette().highlight().color();
+        QColor color = colorValid ? tabData.color : palette().highlight().color();
+        if (fullTabFill.isValid()) {
+            color = fullTabColors(fullTabFill, tabIndex == currentIndex(), palette().window().color()).text;
+        }
 
         painter.setBrush(color);
         QRect tRect = tabRect(tabIndex);

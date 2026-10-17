@@ -340,6 +340,66 @@ void ViewManagerTest::testContainerTabColorSettingPreservesUserColor()
     session->tabColorSetByUser(false);
 }
 
+void ViewManagerTest::testSetTabColorAppliesToAllPanes()
+{
+    auto mw = MainWindow();
+    auto *manager = mw.viewManager();
+    manager->newSession(manager->defaultProfile(), m_testDir->path());
+    manager->splitLeftRight();
+
+    auto *viewContainer = manager->activeContainer();
+    const QList<Session *> panes = manager->sessions();
+    QCOMPARE(panes.size(), 2);
+
+    QSignalSpy colorSpy(viewContainer, &TabbedViewContainer::setColor);
+    viewContainer->setTabColor(0, QColor(Qt::red));
+
+    for (Session *pane : panes) {
+        QCOMPARE(pane->color(), QColor(Qt::red));
+        QVERIFY(pane->isTabColorSetByUser());
+    }
+    QVERIFY(!colorSpy.isEmpty());
+    QCOMPARE(colorSpy.last().at(1).value<QColor>(), QColor(Qt::red));
+}
+
+void ViewManagerTest::testResetTabColorRestoresProfileColor()
+{
+    auto mw = MainWindow();
+    auto *manager = mw.viewManager();
+    Profile::Ptr profile(new Profile);
+    profile->setProperty(Profile::TabColor, QColor(Qt::blue));
+    manager->activeContainer()->addView(manager->createView(manager->createSession(profile)));
+    manager->splitLeftRight();
+
+    auto *viewContainer = manager->activeContainer();
+    viewContainer->setTabColor(0, QColor(Qt::red));
+    viewContainer->resetTabColor(0);
+
+    const QList<Session *> panes = manager->sessions();
+    QCOMPARE(panes.size(), 2);
+    for (Session *pane : panes) {
+        QCOMPARE(pane->color(), QColor(Qt::blue));
+        QVERIFY(!pane->isTabColorSetByUser());
+    }
+}
+
+void ViewManagerTest::testResetTabColorRestoresContainerColor()
+{
+    auto mw = MainWindow();
+    TestContainerDetector detector;
+    const ContainerInfo container = containerInfo(&detector, QStringLiteral("fedora"));
+    QVERIFY(QMetaObject::invokeMethod(&mw, "newInContainer", Qt::DirectConnection, Q_ARG(Konsole::ContainerInfo, container)));
+    Session *session = mw.viewManager()->activeViewController()->session();
+    session->setContainerContext(container);
+
+    auto *viewContainer = mw.viewManager()->activeContainer();
+    viewContainer->setTabColor(0, QColor(Qt::red));
+    viewContainer->resetTabColor(0);
+
+    QCOMPARE(session->color(), ContainerSessionState::colorForContainerKey(containerKey(container)));
+    QVERIFY(!session->isTabColorSetByUser());
+}
+
 QTEST_MAIN(ViewManagerTest)
 
 #include "moc_ViewManagerTest.cpp"

@@ -1022,13 +1022,7 @@ void MainWindow::newInContainer(const ContainerInfo &container)
                                                        container.detector ? container.detector->displayName() : QString(),
                                                        container.displayName.isEmpty() ? container.name : container.displayName);
 
-        if (!session->isTabColorSetByUser() && defaultProfile && !defaultProfile->tabColor().isValid()) {
-            if (!key.isEmpty()) {
-                session->setColor(ContainerSessionState::colorForContainerKey(key));
-            } else {
-                session->setColor(QColor());
-            }
-        }
+        _viewManager->applyAutomaticTabColor(session);
     }
 }
 

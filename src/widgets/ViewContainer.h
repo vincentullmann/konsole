@@ -82,6 +82,11 @@ public:
     /** Sets tab progress */
     void updateProgress(ViewProperties *item);
 
+    /** Sets @p color as the Manual color of every Pane in the tab at @p index */
+    void setTabColor(int index, const QColor &color);
+    /** Clears the Manual color of every Pane in the tab at @p index, so the container or profile color applies again */
+    void resetTabColor(int index);
+
     /** Changes the active view to the next view */
     void activateNextView();
 
@@ -239,6 +244,8 @@ private:
     void removeContainerBadge(TerminalDisplay *display);
     void updateContainerBadgeForDisplay(TerminalDisplay *display);
     QColor effectiveTabColor(ViewSplitter *splitter) const;
+    /** The Sessions of all Panes in the tab at @p index */
+    QList<Session *> paneSessions(int index);
     QColor effectiveTabActivityColor(ViewSplitter *splitter) const;
 
     struct TabIconState {

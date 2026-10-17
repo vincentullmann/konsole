@@ -30,6 +30,9 @@ private Q_SLOTS:
     void testContainerMenuLaunchKeepsPendingColor();
     void testContainerTabColorSettingHidesAutoColor();
     void testContainerTabColorSettingPreservesUserColor();
+    void testSetTabColorAppliesToAllPanes();
+    void testResetTabColorRestoresProfileColor();
+    void testResetTabColorRestoresContainerColor();
 
 private:
     std::unique_ptr<QTemporaryDir> m_testDir;

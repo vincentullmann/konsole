@@ -42,6 +42,9 @@ public:
 
     void setProgress(int idx, const std::optional<int> &progress);
 
+    /** The color to fill the tab at @p idx with, or an invalid color if the tab is not drawn filled */
+    QColor fullTabColor(int idx) const;
+
 Q_SIGNALS:
     void detachTab(int index);
     void moveTabToWindow(int tabIndex, QWidget *otherWindow);

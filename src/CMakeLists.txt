@@ -150,6 +150,7 @@ target_sources(konsoleprivate PRIVATE
     history/compact/CompactHistoryScroll.cpp
     history/compact/CompactHistoryType.cpp
     widgets/DetachableTabBar.cpp
+    widgets/TabColorStyle.cpp
     widgets/EditProfileDialog.cpp
     widgets/HistorySizeWidget.cpp
     widgets/IncrementalSearchBar.cpp

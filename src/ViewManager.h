@@ -196,6 +196,12 @@ public:
      */
     Session *createSession(const QExplicitlySharedDataPointer<Profile> &profile, const QString &directory = QString());
 
+    /** Gives @p session the color it gets when no Manual color is set: its container color, else its profile color */
+    void applyAutomaticTabColor(Session *session);
+
+    /** Clears the Manual Tab Color of @p session, so its container or profile color applies again */
+    void resetTabColor(Session *session);
+
     void setContextMenuAdditionalActions(const QList<QAction *> &extension);
 
 Q_SIGNALS:
@@ -520,7 +526,6 @@ private:
 
     void registerTerminal(TerminalDisplay *terminal);
     void unregisterTerminal(TerminalDisplay *terminal);
-    void updateAutoContainerTabColor(Session *session);
     static QColor colorForContainerKey(const QString &containerKey);
 
 private:

@@ -79,6 +79,8 @@
 #include "history/compact/CompactHistoryType.h"
 
 #include "profile/ProfileList.h"
+#include "widgets/ViewContainer.h"
+#include "widgets/ViewSplitter.h"
 
 #include "SessionGroup.h"
 #include "SessionManager.h"
@@ -1124,8 +1126,17 @@ void SessionController::renameSession()
         }
 
         if (tabColor != sessionTabColor) {
-            session()->setColor(tabColor);
-            Q_EMIT tabColoredByUser(true);
+            // The Tab Color is a tab-level setting, so it goes to every Pane of the tab
+            TabbedViewContainer *container = nullptr;
+            for (QWidget *widget = view(); widget != nullptr && container == nullptr; widget = widget->parentWidget()) {
+                container = qobject_cast<TabbedViewContainer *>(widget);
+            }
+            if (container != nullptr) {
+                container->setTabColor(container->indexOf(ViewSplitter::parentSplitterForDisplay(view())->getToplevelSplitter()), tabColor);
+            } else {
+                session()->setColor(tabColor);
+                Q_EMIT tabColoredByUser(true);
+            }
             snapshot();
         }
 
