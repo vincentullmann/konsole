@@ -10,6 +10,8 @@
 #include <QColor>
 #include <QProxyStyle>
 
+class QPainter;
+
 #include "konsoleprivate_export.h"
 
 namespace Konsole
@@ -27,12 +29,18 @@ struct FullTabColors {
  */
 KONSOLEPRIVATE_EXPORT FullTabColors fullTabColors(const QColor &tabColor, bool active, const QColor &background);
 
+/** Fills the shape of a tab at @p rect with @p fill */
+void paintFullTabFill(QPainter *painter, const QRect &rect, const QColor &fill);
+
 class DetachableTabBar;
 
 /**
  * Paints colored tabs of a DetachableTabBar in the "Full tab" Tab Color style:
  * the tab is filled with its color, and activity is shown as bold text.
  * Everything else is left to the base style.
+ *
+ * A style sheet replaces this style's drawing, so DetachableTabBar paints
+ * the fill itself then.
  */
 class TabColorStyle : public QProxyStyle
 {

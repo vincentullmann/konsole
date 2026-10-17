@@ -33,6 +33,8 @@ private Q_SLOTS:
     void testSetTabColorAppliesToAllPanes();
     void testResetTabColorRestoresProfileColor();
     void testResetTabColorRestoresContainerColor();
+    void testFullTabFillsTab_data();
+    void testFullTabFillsTab();
 
 private:
     std::unique_ptr<QTemporaryDir> m_testDir;

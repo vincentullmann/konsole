@@ -25,6 +25,16 @@ FullTabColors fullTabColors(const QColor &tabColor, bool active, const QColor &b
     return {fill, text};
 }
 
+void paintFullTabFill(QPainter *painter, const QRect &rect, const QColor &fill)
+{
+    painter->save();
+    painter->setRenderHint(QPainter::Antialiasing);
+    painter->setPen(Qt::NoPen);
+    painter->setBrush(fill);
+    painter->drawRoundedRect(QRectF(rect).adjusted(1, 2, -1, -1), 3, 3);
+    painter->restore();
+}
+
 TabColorStyle::TabColorStyle(DetachableTabBar *tabBar)
     : _tabBar(tabBar)
 {
@@ -57,22 +67,12 @@ void TabColorStyle::drawControl(ControlElement element, const QStyleOption *opti
         if (!active && (tabOption->state & State_MouseOver)) {
             colors.fill = KColorUtils::mix(colors.fill, tabColor, 0.5);
         }
-        painter->save();
-        painter->setRenderHint(QPainter::Antialiasing);
-        painter->setPen(Qt::NoPen);
-        painter->setBrush(colors.fill);
-        painter->drawRoundedRect(QRectF(tabOption->rect).adjusted(1, 2, -1, -1), 3, 3);
-        painter->restore();
+        paintFullTabFill(painter, tabOption->rect, colors.fill);
         return;
     }
 
-    // CE_TabBarTabLabel: contrasting text, and bold text in place of the activity text color
+    // CE_TabBarTabLabel: DetachableTabBar already set the text color, show activity as bold text
     QStyleOptionTab label(*tabOption);
-    for (const auto group : {QPalette::Active, QPalette::Inactive, QPalette::Disabled}) {
-        for (const auto role : {QPalette::WindowText, QPalette::ButtonText, QPalette::Text, QPalette::HighlightedText}) {
-            label.palette.setColor(group, role, colors.text);
-        }
-    }
 
     painter->save();
     if (_tabBar->tabTextColor(index).isValid()) {

@@ -6,6 +6,8 @@
 
 #include "ViewManagerTest.h"
 #include <QFile>
+#include <QScopeGuard>
+#include <QTabBar>
 #include <QTest>
 
 #include "../KonsoleSettings.h"
@@ -111,6 +113,9 @@ void ViewManagerTest::cleanup()
 {
     KonsoleSettings::setShowContainerTabColor(true);
     KonsoleSettings::setShowContainerStatusBar(true);
+    KonsoleSettings::setTabColorStyle(KonsoleSettings::EnumTabColorStyle::Bar);
+    KonsoleSettings::setTabBarUseUserStyleSheet(false);
+    KonsoleSettings::setTabBarVisibility(KonsoleSettings::EnumTabBarVisibility::ShowTabBarWhenNeeded);
 }
 
 void ViewManagerTest::testSaveLayout()
@@ -398,6 +403,72 @@ void ViewManagerTest::testResetTabColorRestoresContainerColor()
 
     QCOMPARE(session->color(), ContainerSessionState::colorForContainerKey(containerKey(container)));
     QVERIFY(!session->isTabColorSetByUser());
+}
+
+void ViewManagerTest::testFullTabFillsTab_data()
+{
+    QTest::addColumn<int>("colorStyle");
+    QTest::addColumn<bool>("useStyleSheet");
+    QTest::addColumn<bool>("expectFilled");
+
+    QTest::newRow("bar") << int(KonsoleSettings::EnumTabColorStyle::Bar) << false << false;
+    QTest::newRow("bar, style sheet") << int(KonsoleSettings::EnumTabColorStyle::Bar) << true << false;
+    QTest::newRow("full tab") << int(KonsoleSettings::EnumTabColorStyle::FullTab) << false << true;
+    // A style sheet bypasses TabColorStyle, so the tab bar paints the fill itself
+    QTest::newRow("full tab, style sheet") << int(KonsoleSettings::EnumTabColorStyle::FullTab) << true << true;
+}
+
+void ViewManagerTest::testFullTabFillsTab()
+{
+    QFETCH(int, colorStyle);
+    QFETCH(bool, useStyleSheet);
+    QFETCH(bool, expectFilled);
+
+    const QString styleSheetPath = m_testDir->filePath(QStringLiteral("tabs.css"));
+    QFile styleSheet(styleSheetPath);
+    QVERIFY(styleSheet.open(QIODevice::WriteOnly | QIODevice::Text));
+    styleSheet.write("QTabBar::tab { padding: 2px 16px; border: none; }");
+    styleSheet.close();
+
+    KonsoleSettings::setTabBarVisibility(KonsoleSettings::EnumTabBarVisibility::AlwaysShowTabBar);
+    KonsoleSettings::setTabBarUseUserStyleSheet(useStyleSheet);
+    KonsoleSettings::setTabBarUserStyleSheetFile(QUrl::fromLocalFile(styleSheetPath));
+    KonsoleSettings::setTabColorStyle(colorStyle);
+
+    auto mw = MainWindow();
+
+    // The tab bar is only shown in the konsole application. Set the name after creating
+    // the window, which resets it, and before the config refresh that decides visibility.
+    const QString applicationName = QCoreApplication::applicationName();
+    QCoreApplication::setApplicationName(QStringLiteral("konsole"));
+    auto restoreName = qScopeGuard([&applicationName] {
+        QCoreApplication::setApplicationName(applicationName);
+    });
+
+    auto *manager = mw.viewManager();
+    manager->newSession(manager->defaultProfile(), m_testDir->path());
+    manager->newSession(manager->defaultProfile(), m_testDir->path());
+    auto *viewContainer = manager->activeContainer();
+    Q_EMIT KonsoleSettings::self()->configChanged();
+    QVERIFY(!viewContainer->tabBar()->isHidden());
+
+    const QColor tabColor(0xda, 0x44, 0x53);
+    viewContainer->setTabColor(0, tabColor);
+    viewContainer->setCurrentIndex(0);
+
+    mw.resize(800, 300);
+    mw.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&mw));
+
+    QTabBar *tabBar = viewContainer->tabBar();
+    QCOMPARE(tabBar->testAttribute(Qt::WA_StyleSheet), useStyleSheet);
+
+    // Sample in the left padding: the Bar style's color bar starts 6px in, and the title further in
+    const QRect tab = tabBar->tabRect(0);
+    const QImage image = tabBar->grab().toImage();
+    const QColor sampled = image.pixelColor(tab.left() + 3, tab.center().y());
+
+    QCOMPARE(sampled == tabColor, expectFilled);
 }
 
 QTEST_MAIN(ViewManagerTest)

@@ -17,6 +17,7 @@
 
 #include <QColor>
 #include <QPainter>
+#include <QStyleOptionTab>
 
 namespace Konsole
 {
@@ -193,8 +194,38 @@ void DetachableTabBar::dragMoveEvent(QDragMoveEvent *event)
     }
 }
 
+void DetachableTabBar::initStyleOption(QStyleOptionTab *option, int tabIndex) const
+{
+    QTabBar::initStyleOption(option, tabIndex);
+
+    const QColor tabColor = fullTabColor(tabIndex);
+    if (!tabColor.isValid()) {
+        return;
+    }
+
+    // Set here rather than in TabColorStyle, so that style sheets use it too
+    const QColor text = fullTabColors(tabColor, option->state & QStyle::State_Selected, palette().window().color()).text;
+    for (const auto group : {QPalette::Active, QPalette::Inactive, QPalette::Disabled}) {
+        for (const auto role : {QPalette::WindowText, QPalette::ButtonText, QPalette::Text, QPalette::HighlightedText}) {
+            option->palette.setColor(group, role, text);
+        }
+    }
+}
+
 void DetachableTabBar::paintEvent(QPaintEvent *event)
 {
+    // A style sheet bypasses TabColorStyle, so paint the fill under the tabs here
+    const bool styleSheetActive = testAttribute(Qt::WA_StyleSheet);
+    if (styleSheetActive) {
+        QPainter painter(this);
+        for (int tabIndex = 0; tabIndex < count(); tabIndex++) {
+            const QColor tabColor = fullTabColor(tabIndex);
+            if (tabColor.isValid()) {
+                paintFullTabFill(&painter, tabRect(tabIndex), fullTabColors(tabColor, tabIndex == currentIndex(), palette().window().color()).fill);
+            }
+        }
+    }
+
     QTabBar::paintEvent(event);
     if (!event->isAccepted()) {
         return; // Reduces repainting
@@ -214,8 +245,11 @@ void DetachableTabBar::paintEvent(QPaintEvent *event)
         const bool colorValid = tabData.color.isValid() && tabData.color.alpha() > 0;
         const QColor fullTabFill = fullTabColor(tabIndex);
 
-        // A filled tab already shows its color, so only progress gets a bar
-        if ((!colorValid || fullTabFill.isValid()) && !tabData.progress.has_value()) {
+        // Style sheets can't show activity as bold text, so a filled tab gets a faint bar instead
+        const bool activityBar = fullTabFill.isValid() && styleSheetActive && tabTextColor(tabIndex).isValid();
+
+        // A filled tab already shows its color, so only progress (or the activity bar) gets a bar
+        if ((!colorValid || fullTabFill.isValid()) && !tabData.progress.has_value() && !activityBar) {
             continue;
         }
 
@@ -239,6 +273,10 @@ void DetachableTabBar::paintEvent(QPaintEvent *event)
 
             tRect.setWidth(tRect.width() * tabData.progress.value() / 100.0);
             painter.drawRect(tRect);
+        } else if (activityBar) {
+            painter.setOpacity(0.3);
+            painter.drawRect(tRect);
+            painter.setOpacity(1.0);
         } else {
             painter.drawRect(tRect);
         }

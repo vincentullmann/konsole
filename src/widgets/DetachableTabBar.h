@@ -14,6 +14,7 @@
 
 class QColor;
 class QPaintEvent;
+class QStyleOptionTab;
 
 namespace Konsole
 {
@@ -59,6 +60,7 @@ protected:
     void dragEnterEvent(QDragEnterEvent *event) override;
     void dragMoveEvent(QDragMoveEvent *event) override;
     void paintEvent(QPaintEvent *event) override;
+    void initStyleOption(QStyleOptionTab *option, int tabIndex) const override;
 
 private:
     void setDetachableTabData(int idx, const DetachableTabData &data);
